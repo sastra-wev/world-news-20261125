@@ -8,8 +8,9 @@ nothing overlaps and nothing is placed by guesswork twice.  Pictures
 are drawn on their own small canvases (see render.scene_canvas) and
 pasted into the columns they belong to.
 
-Run it:  python3 main.py   ->  writes entry.png beside this file
-(and /output/entry.png when that directory is available).
+Run it:  python3 main.py   ->  writes entry.png to $MAKEFUN_OUTPUT_DIR
+when set, beside this file, and /output/entry.png when available --
+whichever of those destinations are writable.
 Deterministic: same code, same fonts, same pixels, every run.
 """
 
@@ -297,9 +298,26 @@ def compose():
 def main():
     img = compose()
     here = os.path.dirname(os.path.abspath(__file__))
-    img.save(os.path.join(here, "entry.png"))
+    targets = []
+    out_dir = os.environ.get("MAKEFUN_OUTPUT_DIR")
+    if out_dir:
+        targets.append(os.path.join(out_dir, "entry.png"))
+    targets.append(os.path.join(here, "entry.png"))
     if os.path.isdir("/output"):
-        img.save("/output/entry.png")
+        targets.append("/output/entry.png")
+    # A read-only home for this file (a grader mounts the code that way)
+    # must not sink the run: write everywhere writable, and fail only
+    # if no destination at all accepts the page.
+    saved = False
+    last_error = None
+    for path in targets:
+        try:
+            img.save(path)
+            saved = True
+        except OSError as exc:
+            last_error = exc
+    if not saved and last_error is not None:
+        raise last_error
 
 
 if __name__ == "__main__":
